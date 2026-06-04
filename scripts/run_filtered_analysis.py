@@ -63,27 +63,43 @@ for name in factor_names:
     cs = factor_panels[name]
     cs_z[name] = cs.apply(lambda row: (row - row.mean())/row.std(ddof=0), axis=1)
 
-# --- cluster-based industry proxy and neutralization ---
+# industry mapping: prefer official mapping in outputs/industry_map.csv, fallback to cluster-based proxy
 from sklearn.cluster import KMeans
 lookback = 252
-if len(common_index) >= lookback:
-    recent_idx = common_index[-lookback:]
-else:
-    recent_idx = common_index
-# build return matrix for clustering (using daily pct change)
-ret_mat = pd.DataFrame({s: dfs[s]['close'].pct_change().loc[recent_idx] for s in dfs.keys()})
-ret_mat = ret_mat.dropna(axis=1, how='any')
+map_path = os.path.join(OUT_DIR, 'industry_map.csv')
 cluster_labels = {}
-if ret_mat.shape[1] >= 10:
-    corr = ret_mat.corr().fillna(0)
-    X = corr.values
-    n_clusters = min(12, max(2, ret_mat.shape[1] // 20))
-    kmeans = KMeans(n_clusters=n_clusters, random_state=0, n_init=10).fit(X)
-    cols = corr.columns
-    cluster_labels = dict(zip(cols, kmeans.labels_))
-    pd.Series(cluster_labels).to_csv(os.path.join(OUT_DIR, 'industry_clusters.csv'))
-else:
-    print('Skipping clustering: too few symbols for reliable clusters')
+# try official mapping first
+if os.path.exists(map_path):
+    try:
+        im = pd.read_csv(map_path, dtype=str)
+        if 'symbol' in im.columns and 'industry' in im.columns:
+            cluster_labels = dict(zip(im['symbol'].astype(str), im['industry'].astype(str)))
+            pd.Series(cluster_labels).to_csv(os.path.join(OUT_DIR, 'industry_clusters.csv'))
+            print('Loaded official industry map from', map_path)
+        else:
+            print('industry_map.csv found but missing symbol/industry columns; will fallback to clustering')
+    except Exception as e:
+        print('Failed to read industry_map.csv:', e)
+
+# fallback to KMeans clustering on recent returns
+if not cluster_labels:
+    if len(common_index) >= lookback:
+        recent_idx = common_index[-lookback:]
+    else:
+        recent_idx = common_index
+    # build return matrix for clustering (using daily pct change)
+    ret_mat = pd.DataFrame({s: dfs[s]['close'].pct_change().loc[recent_idx] for s in dfs.keys()})
+    ret_mat = ret_mat.dropna(axis=1, how='any')
+    if ret_mat.shape[1] >= 10:
+        corr = ret_mat.corr().fillna(0)
+        X = corr.values
+        n_clusters = min(12, max(2, ret_mat.shape[1] // 20))
+        kmeans = KMeans(n_clusters=n_clusters, random_state=0, n_init=10).fit(X)
+        cols = corr.columns
+        cluster_labels = dict(zip(cols, kmeans.labels_))
+        pd.Series(cluster_labels).to_csv(os.path.join(OUT_DIR, 'industry_clusters.csv'))
+    else:
+        print('Skipping clustering: too few symbols for reliable clusters')
 
 # forward returns
 fwd_horizon = 20
