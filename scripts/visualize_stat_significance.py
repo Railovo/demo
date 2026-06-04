@@ -19,8 +19,8 @@ import seaborn as sns
 
 sns.set(style='whitegrid')
 
-CAND_PVAL_BOOT = ['bootstrap_pvalue','bootstrap_pval','bootstrap_p','p_bootstrap','pvalue_bootstrap','p_value_bootstrap']
-CAND_PVAL_TT = ['ttest_pvalue','ttest_pval','ttest_p','p_ttest','pvalue_ttest','p_value_ttest']
+CAND_PVAL_BOOT = ['bootstrap_pvalue','bootstrap_pval','bootstrap_p','p_bootstrap','pvalue_bootstrap','p_value_bootstrap','boot_pvalue','boot_p']
+CAND_PVAL_TT = ['ttest_pvalue','ttest_pval','ttest_p','p_ttest','pvalue_ttest','p_value_ttest','t_pvalue','t_p']
 CAND_FACTOR = ['factor','name','factor_name']
 CAND_NAV = ['nav','NAV','value','Value','portfolio','Portfolio']
 CAND_BOOTSTRAP_SHARPE = ['bootstrap_sharpe','sharpe_bootstrap','boot_sharpe','bootstrap_sharpes','bootstrap_sharpes','bootstrap_stat']
