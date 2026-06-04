@@ -122,12 +122,12 @@ qret_df.to_csv(os.path.join(OUT_DIR, 'quintile_monthly_returns.csv'))
 print('Wrote quintile_monthly_returns.csv')
 
 # save simple IC summary
-ic_summary = ic_df.rolling(window=252, min_periods=30).mean().tail(1).T
-if ic_summary.shape[0] == 0:
-    # no rolling IC available; write empty file with header
+rolling = ic_df.rolling(window=252, min_periods=30).mean()
+if rolling.shape[0] == 0:
     pd.DataFrame(columns=['ic_rolling_mean']).to_csv(os.path.join(OUT_DIR, 'ic_rolling_mean_latest.csv'))
     print('Wrote empty ic_rolling_mean_latest.csv')
 else:
-    ic_summary.columns = ['ic_rolling_mean']
+    latest = rolling.iloc[-1]
+    ic_summary = latest.to_frame(name='ic_rolling_mean')
     ic_summary.to_csv(os.path.join(OUT_DIR, 'ic_rolling_mean_latest.csv'))
     print('Wrote ic_rolling_mean_latest.csv')
