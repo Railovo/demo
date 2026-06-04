@@ -4,6 +4,6 @@ scipy
 matplotlib
 scikit-learn
 jupyter
-yfinance
+akshare
 statsmodels
 backtrader
