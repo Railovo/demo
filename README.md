@@ -1,8 +1,21 @@
-量化项目模板（多因子/中频）
+旗舰项目：沪深300 多因子研究（可复现）
 
-说明：
-- 运行 scripts\setup_env.ps1 创建 .venv 并安装依赖
-- 使用 scripts\download_akshare.py 下载国内 A 股数据到 data/ 下；如需美股示例，可使用 scripts\generate_synthetic_data.py 生成合成样本（避免 yfinance 限流）
-- 首次提交已创建，本地仓库在此目录
+快速开始：
+1. 克隆仓库并进入项目目录
+2. 创建虚拟环境并安装依赖：
+   - PowerShell: scripts\setup_env.ps1
+   - 或手动： python -m venv .venv && .\.venv\Scripts\python -m pip install -r requirements.txt
+3. 下载并清洗数据（示例顺序）：
+   python scripts\download_hs300_akshare.py
+   python scripts\data_cleaning.py
+   python scripts\filter_pool.py
+   python scripts\run_filtered_analysis.py
 
-下一步：执行第1周任务：运行 setup_env 并下载数据，然后打开 notebooks/clean_data.ipynb 或 scripts/clean_data.py 开始数据清洗。
+结果文件： outputs/filtered_ic_rolling.png, outputs/filtered_quintile_cum_returns.png
+
+主要结论：
+- m120（中期动量）在筛选池上展现稳定正 IC；m60 弱正；vol/size 为负。
+
+产物：notebooks/report.ipynb（可直接展示关键图表）、outputs/one_page_conclusion.md（适合放在简历附件）。
+
+下一步建议：加入行业中性、交易成本模型，构建多因子组合并准备项目页。
