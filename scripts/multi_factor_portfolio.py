@@ -162,6 +162,23 @@ w_m60 = 0.3
 w_size = -0.2
 combined = w_m120 * m120_neu + w_m60 * m60_neu + w_size * cs_z['size']
 
+# --- liquidity and execution model ---
+# compute ADV per symbol (20-day rolling average of volume)
+adv_lookback = 20
+adv_table = pd.DataFrame(index=common_index, columns=combined.columns)
+for s in combined.columns:
+    if 'volume' in dfs[s].columns:
+        adv_table[s] = dfs[s]['volume'].rolling(adv_lookback, min_periods=5).mean()
+    else:
+        adv_table[s] = np.nan
+
+# execution parameters
+max_pct_adv = 0.2        # max fraction of ADV tradeable in a single rebalance per stock
+impact_coeff = 0.0005   # extra slippage per adv fraction on weight basis (approx)
+
+# ensure adv_table aligned
+adv_table = adv_table.reindex(common_index)
+
 # backtest: monthly rebalance on last trading day of month
 month_ends = pd.DatetimeIndex(pd.Series(common_index).groupby(pd.Series(common_index).dt.to_period('M')).last().values)
 
@@ -195,7 +212,28 @@ for date in month_ends:
     pos = pd.Series(0.0, index=combined.columns)
     pos[top] = w_long
     pos[bot] = w_short
-    positions.loc[date] = pos
+    # liquidity-aware scaling: limit traded shares to max_pct_adv * ADV
+    # maintain last_reb_pos to compute deltas
+    if 'last_reb_pos' not in locals():
+        last_reb_pos = pd.Series(0.0, index=combined.columns)
+    delta = pos.fillna(0) - last_reb_pos.fillna(0)
+    # prices on rebalance date
+    prices = pd.Series({s: (dfs[s].loc[date]['close'] if date in dfs[s].index else np.nan) for s in combined.columns})
+    # desired shares to trade (portfolio notional normalized to 1.0)
+    desired_shares = (delta.abs() / prices).replace([np.inf, -np.inf], np.nan).fillna(0.0)
+    adv_shares = adv_table.loc[date].fillna(0.0)
+    allowed_shares = adv_shares * max_pct_adv
+    scale = pd.Series(1.0, index=combined.columns)
+    mask = (desired_shares > 0) & (allowed_shares > 0) & (desired_shares > allowed_shares)
+    if mask.any():
+        scale.loc[mask] = allowed_shares.loc[mask] / desired_shares.loc[mask]
+    # apply scaling to delta
+    adj_delta = delta * scale
+    adj_pos = last_reb_pos + adj_delta
+    # assign adjusted positions for this rebalance
+    positions.loc[date] = adj_pos
+    # update last_reb_pos for next rebalance
+    last_reb_pos = adj_pos.copy()
 
 # forward fill positions until next rebalance
 positions = positions.replace(0, np.nan).ffill().fillna(0)
@@ -212,8 +250,18 @@ costs = pd.Series(0.0, index=positions.index)
 for date in positions.index:
     new_pos = positions.loc[date]
     if date in month_ends:
-        turnover = (new_pos - prev_pos).abs().sum() / 2.0
-        costs.loc[date] = turnover * cost_rate
+        delta = (new_pos - prev_pos).fillna(0)
+        turnover = delta.abs().sum() / 2.0
+        # compute impact cost from ADV fraction
+        prices = pd.Series({s: (dfs[s].loc[date]['close'] if date in dfs[s].index else np.nan) for s in positions.columns})
+        traded_shares = (delta.abs() / prices).replace([np.inf, -np.inf], np.nan).fillna(0.0)
+        adv_shares = adv_table.loc[date].fillna(0.0)
+        adv_frac = pd.Series(0.0, index=positions.columns)
+        mask_adv = (adv_shares > 0)
+        adv_frac.loc[mask_adv] = traded_shares.loc[mask_adv] / adv_shares.loc[mask_adv]
+        # impact cost: impact_coeff * adv_frac * abs(delta_weight)
+        impact_cost = (impact_coeff * adv_frac * delta.abs()).sum()
+        costs.loc[date] = turnover * cost_rate + impact_cost
     prev_pos = new_pos
 
 # subtract costs on rebalance days from port_ret
