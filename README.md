@@ -1,3 +1,6 @@
+![IC Rolling](outputs/filtered_ic_rolling.png)
+![Quintile Cumulative Returns](outputs/filtered_quintile_cum_returns.png)
+
 旗舰项目：沪深300 多因子研究（可复现）
 
 快速开始：
